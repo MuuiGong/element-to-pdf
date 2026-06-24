@@ -1,0 +1,72 @@
+html,
+body {
+  margin: 0;
+  min-width: max-content;
+  min-height: max-content;
+  background: #ffffff;
+}
+
+body {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+#capture-root {
+  display: inline-block;
+  min-width: max-content;
+  background: #ffffff;
+}
+
+#capture-root > * {
+  display: block;
+}
+
+.visual-capture {
+  display: block;
+  object-fit: fill;
+}
+
+#print-status {
+  position: fixed;
+  right: 14px;
+  top: 14px;
+  z-index: 2147483647;
+  max-width: min(420px, calc(100vw - 28px));
+  padding: 9px 11px;
+  border: 1px solid #d0d5dd;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #344054;
+  box-shadow: 0 10px 28px rgba(16, 24, 40, 0.16);
+  font: 12px/1.45 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+#print-status.error {
+  border-color: #fecdca;
+  color: #b42318;
+}
+
+.element-pdf-error {
+  max-width: 720px;
+  margin: 32px;
+  padding: 16px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  color: #101828;
+  font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+@page {
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff;
+  }
+
+  #print-status {
+    display: none;
+  }
+}
