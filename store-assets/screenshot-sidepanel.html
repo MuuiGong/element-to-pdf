@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Element PDF Extractor screenshot</title>
+    <link rel="stylesheet" href="../src/sidepanel.css" />
+    <style>
+      body {
+        width: 1280px;
+        height: 800px;
+        overflow: hidden;
+        background: #f1f3f4;
+      }
+
+      .shot {
+        display: grid;
+        grid-template-columns: 390px 1fr;
+        width: 1280px;
+        height: 800px;
+      }
+
+      .app {
+        border-right: 1px solid #c4c9d1;
+        background: #ffffff;
+      }
+
+      .page {
+        padding: 48px;
+        background: #f8fafd;
+        color: #202124;
+        font: 14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .page-card {
+        width: 680px;
+        border: 1px solid #d9dde3;
+        border-radius: 6px;
+        background: #ffffff;
+        box-shadow: 0 1px 2px rgba(60, 64, 67, 0.12);
+      }
+
+      .page-head {
+        padding: 18px 22px;
+        border-bottom: 1px solid #e4e7eb;
+        font-weight: 600;
+      }
+
+      .page-body {
+        padding: 22px;
+      }
+
+      .field-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+        margin: 18px 0 22px;
+      }
+
+      .field {
+        display: grid;
+        gap: 5px;
+      }
+
+      .field span {
+        color: #70757a;
+        font-size: 12px;
+      }
+
+      .selected-box {
+        outline: 2px solid #1a73e8;
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shot">
+      <div class="app">
+        <header class="topbar">
+          <div class="brand">
+            <div class="brand-text">
+              <span class="brand-title">Elements</span>
+              <span class="brand-host">careers.example.com/apply</span>
+            </div>
+          </div>
+          <div class="top-actions">
+            <button class="ghost-btn icon-only" type="button" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
+            <button class="ghost-btn pick-btn" type="button"><span>Pick</span></button>
+            <button class="ghost-btn icon-only" type="button" title="Refresh">R</button>
+          </div>
+        </header>
+
+        <div class="searchbar">
+          <svg class="search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          <input type="search" value="resume" />
+          <span class="search-count">3</span>
+        </div>
+
+        <main class="tree-wrap">
+          <div class="tree" role="tree">
+            <div class="node">
+              <div class="row"><span class="twisty"></span><span class="label"><span class="t-punct">&lt;</span><span class="t-tag">html</span><span class="t-punct">&gt;</span></span></div>
+              <div class="children">
+                <div class="node">
+                  <div class="row"><span class="twisty"></span><span class="label"><span class="t-punct">&lt;</span><span class="t-tag">body</span><span class="t-punct">&gt;</span></span></div>
+                  <div class="children">
+                    <div class="node">
+                      <div class="row"><span class="twisty"></span><span class="label"><span class="t-punct">&lt;</span><span class="t-tag">main</span><span class="t-class">.application</span><span class="t-punct">&gt;</span></span></div>
+                      <div class="children">
+                        <div class="node selected">
+                          <div class="row"><span class="twisty"></span><span class="label"><span class="t-punct">&lt;</span><span class="t-tag">section</span><span class="t-id">#resume-preview</span><span class="t-class">.card</span><span class="t-punct">&gt;</span></span></div>
+                          <div class="children">
+                            <div class="node"><div class="row"><span class="twisty leaf"></span><span class="label"><span class="t-punct">&lt;</span><span class="t-tag">header</span><span class="t-class">.summary</span><span class="t-punct">&gt;</span></span></div></div>
+                            <div class="node"><div class="row"><span class="twisty leaf"></span><span class="label"><span class="t-punct">&lt;</span><span class="t-tag">div</span><span class="t-class">.experience-list</span><span class="t-punct">&gt;</span></span></div></div>
+                            <div class="node"><div class="row"><span class="twisty leaf"></span><span class="label"><span class="t-punct">&lt;</span><span class="t-tag">button</span><span class="t-class">.submit</span><span class="t-punct">&gt;</span><span class="t-text"> Export PDF</span></span></div></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <footer class="actionbar">
+          <nav class="crumbs"><span class="crumb">body</span><span class="crumb-sep">›</span><span class="crumb">main.application</span><span class="crumb-sep">›</span><span class="crumb is-last">section#resume-preview</span></nav>
+          <div class="selinfo">
+            <span class="selinfo-main">section#resume-preview.card</span>
+            <span class="selinfo-dim">680 x 420</span>
+          </div>
+          <div class="footer-row">
+            <span class="status ok">Ready to export selected element.</span>
+            <button class="ghost-btn icon-only" type="button" title="Export options">⚙</button>
+            <button class="export-btn" type="button"><span>Export PDF</span></button>
+          </div>
+        </footer>
+      </div>
+
+      <section class="page">
+        <div class="page-card selected-box">
+          <div class="page-head">Application preview</div>
+          <div class="page-body">
+            <h1>Kim Jongwon</h1>
+            <p>Frontend engineer applicant summary</p>
+            <div class="field-grid">
+              <div class="field"><span>Role</span><strong>Platform developer</strong></div>
+              <div class="field"><span>Experience</span><strong>2 years</strong></div>
+              <div class="field"><span>Status</span><strong>Final review</strong></div>
+            </div>
+            <p>The extension keeps the page visible while the selected subtree is highlighted and exported.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>
