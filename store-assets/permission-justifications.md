@@ -4,7 +4,7 @@ Use these explanations in the Chrome Web Store Privacy and permissions forms.
 
 ## Single purpose
 
-Element PDF Extractor lets users select a specific element on a web page and export that selected element as a PDF.
+element-to-pdf lets users select a specific element on a web page and export that selected element as a PDF.
 
 ## activeTab
 

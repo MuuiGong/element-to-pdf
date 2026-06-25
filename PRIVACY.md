@@ -1,12 +1,12 @@
-# Privacy Policy for Element PDF Extractor
+# Privacy Policy for element-to-pdf
 
 Last updated: June 25, 2026
 
-Element PDF Extractor is a Chrome extension that lets users select a page element and export it as a PDF.
+element-to-pdf is a Chrome extension that lets users select a page element and export it as a PDF.
 
 ## Data collection
 
-Element PDF Extractor does not collect, sell, transfer, or share user data with the developer or any third party.
+element-to-pdf does not collect, sell, transfer, or share user data with the developer or any third party.
 
 The extension can read the current web page only to provide its core feature: showing an element tree, highlighting elements, and exporting a user-selected element to a PDF. Page content is processed locally in the browser.
 
@@ -18,7 +18,7 @@ The extension does not run a remote server and does not upload page content, PDF
 
 ## Permissions
 
-Element PDF Extractor requests Chrome permissions only for its element selection and PDF export workflow:
+element-to-pdf requests Chrome permissions only for its element selection and PDF export workflow:
 
 - Access to web pages is used to inspect and export user-selected elements.
 - Debugger access is used to call Chrome's built-in PDF generation APIs on the current tab after the user starts an export.

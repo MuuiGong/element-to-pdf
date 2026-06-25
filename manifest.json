@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Element PDF Extractor",
+  "name": "element-to-pdf",
   "description": "Pick any visible page element and export it as a PDF.",
   "version": "0.1.0",
   "homepage_url": "https://github.com/MuuiGong/element-to-pdf",
@@ -29,7 +29,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Element PDF (open panel)",
+    "default_title": "element-to-pdf (open panel)",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",

@@ -1,6 +1,6 @@
-const MENU_PICK = "element-pdf:start-picker";
+const MENU_PICK = "element-to-pdf:start-picker";
 const DEBUGGER_PROTOCOL_VERSION = "1.3";
-const JOB_DB_NAME = "element-pdf-extractor";
+const JOB_DB_NAME = "element-to-pdf";
 const JOB_DB_VERSION = 1;
 const JOB_STORE_NAME = "print-jobs";
 const PRINT_READY_DELAY_MS = 350;
@@ -28,7 +28,7 @@ enableSidePanelOnActionClick();
 function enableSidePanelOnActionClick() {
   chrome.sidePanel
     ?.setPanelBehavior?.({ openPanelOnActionClick: true })
-    .catch((error) => console.warn("Element PDF: could not configure side panel", error));
+    .catch((error) => console.warn("element-to-pdf: could not configure side panel", error));
 }
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
@@ -48,12 +48,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
-  if (message.type === "ELEMENT_PDF_PING") {
+  if (message.type === "ELEMENT_TO_PDF_PING") {
     sendResponse({ ok: true });
     return false;
   }
 
-  if (message.type === "ELEMENT_PDF_INJECT_ALL_FRAMES") {
+  if (message.type === "ELEMENT_TO_PDF_INJECT_ALL_FRAMES") {
     withAsyncResponse(sendResponse, async () => {
       if (!Number.isInteger(message.tabId)) {
         throw new Error("Missing tabId.");
@@ -65,14 +65,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "ELEMENT_PDF_SNAPSHOT") {
+  if (message.type === "ELEMENT_TO_PDF_SNAPSHOT") {
     withAsyncResponse(sendResponse, async () => {
       return createPrintJob(message.payload, sender);
     });
     return true;
   }
 
-  if (message.type === "ELEMENT_PDF_FETCH_ASSET") {
+  if (message.type === "ELEMENT_TO_PDF_FETCH_ASSET") {
     withAsyncResponse(sendResponse, async () => {
       const dataUrl = await fetchAssetAsDataUrl(message.url);
       return { ok: true, dataUrl };
@@ -80,7 +80,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "ELEMENT_PDF_GET_JOB") {
+  if (message.type === "ELEMENT_TO_PDF_GET_JOB") {
     withAsyncResponse(sendResponse, async () => {
       const job = await getPrintJob(message.jobId);
       return { ok: true, job };
@@ -88,7 +88,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "ELEMENT_PDF_PRINT_READY") {
+  if (message.type === "ELEMENT_TO_PDF_PRINT_READY") {
     withAsyncResponse(sendResponse, async () => {
       const tabId = sender.tab?.id;
       if (!Number.isInteger(tabId)) {
@@ -100,23 +100,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "ELEMENT_PDF_GET_DOM_TREE_FOR_TAB") {
+  if (message.type === "ELEMENT_TO_PDF_GET_DOM_TREE_FOR_TAB") {
     withAsyncResponse(sendResponse, async () => {
       const tabId = validateTabId(message.tabId);
       await ensureContentScript(tabId, 0);
       return sendMessageToFrame(tabId, 0, {
-        type: "ELEMENT_PDF_GET_DOM_TREE"
+        type: "ELEMENT_TO_PDF_GET_DOM_TREE"
       });
     });
     return true;
   }
 
-  if (message.type === "ELEMENT_PDF_HIGHLIGHT_NODE_FOR_TAB") {
+  if (message.type === "ELEMENT_TO_PDF_HIGHLIGHT_NODE_FOR_TAB") {
     withAsyncResponse(sendResponse, async () => {
       const tabId = validateTabId(message.tabId);
       await ensureContentScript(tabId, 0);
       return sendMessageToFrame(tabId, 0, {
-        type: "ELEMENT_PDF_HIGHLIGHT_NODE",
+        type: "ELEMENT_TO_PDF_HIGHLIGHT_NODE",
         nodeId: message.nodeId,
         scrollIntoView: message.scrollIntoView === true
       });
@@ -124,25 +124,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "ELEMENT_PDF_EXPORT_NODE_FOR_TAB") {
+  if (message.type === "ELEMENT_TO_PDF_EXPORT_NODE_FOR_TAB") {
     withAsyncResponse(sendResponse, async () => {
       const tabId = validateTabId(message.tabId);
       await ensureContentScript(tabId, 0);
       return sendMessageToFrame(tabId, 0, {
-        type: "ELEMENT_PDF_EXPORT_NODE",
+        type: "ELEMENT_TO_PDF_EXPORT_NODE",
         nodeId: message.nodeId
       });
     });
     return true;
   }
 
-  if (message.type === "ELEMENT_PDF_SELECT_NODE_FOR_TAB") {
+  if (message.type === "ELEMENT_TO_PDF_SELECT_NODE_FOR_TAB") {
     withAsyncResponse(sendResponse, async () => {
       const tabId = validateTabId(message.tabId);
       await ensureContentScript(tabId, 0);
       stopPickerInOtherFrames(tabId, 0);
       return sendMessageToFrame(tabId, 0, {
-        type: "ELEMENT_PDF_SELECT_NODE",
+        type: "ELEMENT_TO_PDF_SELECT_NODE",
         nodeId: message.nodeId,
         scrollIntoView: message.scrollIntoView === true
       });
@@ -150,34 +150,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "ELEMENT_PDF_EXPORT_SELECTION_FOR_TAB") {
+  if (message.type === "ELEMENT_TO_PDF_EXPORT_SELECTION_FOR_TAB") {
     withAsyncResponse(sendResponse, async () => {
       const tabId = validateTabId(message.tabId);
       const frameId = Number.isInteger(message.frameId) ? message.frameId : 0;
       await ensureContentScript(tabId, frameId);
       return sendMessageToFrame(tabId, frameId, {
-        type: "ELEMENT_PDF_EXPORT_SELECTION",
+        type: "ELEMENT_TO_PDF_EXPORT_SELECTION",
         options: message.options || null
       });
     });
     return true;
   }
 
-  if (message.type === "ELEMENT_PDF_CLEAR_HIGHLIGHT_FOR_TAB") {
+  if (message.type === "ELEMENT_TO_PDF_CLEAR_HIGHLIGHT_FOR_TAB") {
     withAsyncResponse(sendResponse, async () => {
       const tabId = validateTabId(message.tabId);
       if (message.scope === "all") {
         await clearAllFrames(tabId);
       } else {
         await ensureContentScript(tabId, 0);
-        await sendMessageToFrame(tabId, 0, { type: "ELEMENT_PDF_CLEAR_HIGHLIGHT" });
+        await sendMessageToFrame(tabId, 0, { type: "ELEMENT_TO_PDF_CLEAR_HIGHLIGHT" });
       }
       return { ok: true };
     });
     return true;
   }
 
-  if (message.type === "ELEMENT_PDF_START_PICKER_FOR_TAB") {
+  if (message.type === "ELEMENT_TO_PDF_START_PICKER_FOR_TAB") {
     withAsyncResponse(sendResponse, async () => {
       const tabId = validateTabId(message.tabId);
       await startPickerInAllFrames(tabId);
@@ -186,7 +186,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "ELEMENT_PDF_PICKER_DONE") {
+  if (message.type === "ELEMENT_TO_PDF_PICKER_DONE") {
     const tabId = sender.tab?.id;
     const frameId = Number.isInteger(sender.frameId) ? sender.frameId : 0;
     if (Number.isInteger(tabId)) {
@@ -195,7 +195,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
 
-  if (message.type === "ELEMENT_PDF_PICKER_HOVER") {
+  if (message.type === "ELEMENT_TO_PDF_PICKER_HOVER") {
     const tabId = sender.tab?.id;
     const frameId = Number.isInteger(sender.frameId) ? sender.frameId : 0;
     if (Number.isInteger(tabId)) {
@@ -211,11 +211,11 @@ async function startPickerInFrame(tabId, frameId) {
   try {
     await ensureContentScript(tabId, frameId);
     await sendMessageToFrame(tabId, frameId, {
-      type: "ELEMENT_PDF_START_PICKER",
+      type: "ELEMENT_TO_PDF_START_PICKER",
       mode: "export"
     });
   } catch (error) {
-    console.warn("Element PDF: could not start picker", error);
+    console.warn("element-to-pdf: could not start picker", error);
   }
 }
 
@@ -226,13 +226,13 @@ async function startPickerInAllFrames(tabId) {
     await Promise.allSettled(
       frameIds.map((frameId) =>
         sendMessageToFrame(tabId, frameId, {
-          type: "ELEMENT_PDF_START_PICKER",
+          type: "ELEMENT_TO_PDF_START_PICKER",
           mode: "select"
         })
       )
     );
   } catch (error) {
-    console.warn("Element PDF: could not start picker in frames", error);
+    console.warn("element-to-pdf: could not start picker in frames", error);
   }
 }
 
@@ -243,7 +243,7 @@ async function stopPickerInOtherFrames(tabId, exceptFrameId) {
       frameIds
         .filter((frameId) => frameId !== exceptFrameId)
         .map((frameId) =>
-          sendMessageToFrame(tabId, frameId, { type: "ELEMENT_PDF_STOP_PICKER" })
+          sendMessageToFrame(tabId, frameId, { type: "ELEMENT_TO_PDF_STOP_PICKER" })
         )
     );
   } catch (_error) {
@@ -258,7 +258,7 @@ async function clearPickerOverlayInOtherFrames(tabId, exceptFrameId) {
       frameIds
         .filter((frameId) => frameId !== exceptFrameId)
         .map((frameId) =>
-          sendMessageToFrame(tabId, frameId, { type: "ELEMENT_PDF_CLEAR_PICKER_OVERLAY" })
+          sendMessageToFrame(tabId, frameId, { type: "ELEMENT_TO_PDF_CLEAR_PICKER_OVERLAY" })
         )
     );
   } catch (_error) {
@@ -271,7 +271,7 @@ async function clearAllFrames(tabId) {
     const frameIds = await getInspectableFrameIds(tabId);
     await Promise.allSettled(
       frameIds.map((frameId) =>
-        sendMessageToFrame(tabId, frameId, { type: "ELEMENT_PDF_STOP_PICKER" })
+        sendMessageToFrame(tabId, frameId, { type: "ELEMENT_TO_PDF_STOP_PICKER" })
       )
     );
   } catch (_error) {
@@ -348,7 +348,7 @@ async function printSourceElementToPdf(payload, sender) {
     await sendExportStatus(job, "Preparing source page for PDF...", "info");
 
     const prepareResponse = await sendMessageToFrame(tabId, frameId, {
-      type: "ELEMENT_PDF_PREPARE_SOURCE_PRINT",
+      type: "ELEMENT_TO_PDF_PREPARE_SOURCE_PRINT",
       sourcePrintId: payload.sourcePrintId
     });
 
@@ -428,7 +428,7 @@ async function printSourceElementToPdf(payload, sender) {
 
     if (prepared) {
       await sendMessageToFrame(tabId, frameId, {
-        type: "ELEMENT_PDF_RESTORE_SOURCE_PRINT",
+        type: "ELEMENT_TO_PDF_RESTORE_SOURCE_PRINT",
         sourcePrintId: payload.sourcePrintId
       }).catch(() => undefined);
     }
@@ -524,7 +524,7 @@ async function printTabToPdf(tabId, jobId, dimensions) {
     await sendExportStatus(job, "PDF download started.", "success");
     return { ok: true, mode: "download" };
   } catch (error) {
-    console.warn("Element PDF: automatic PDF generation failed; falling back to print dialog", error);
+    console.warn("element-to-pdf: automatic PDF generation failed; falling back to print dialog", error);
     await sendExportStatus(job, "Automatic PDF failed. Opening Chrome print dialog.", "error");
     return openManualPrintFallback(tabId, jobId, error);
   } finally {
@@ -690,7 +690,7 @@ async function ensureContentScriptAllFrames(tabId) {
 
 async function ensureContentScript(tabId, frameId) {
   try {
-    await sendMessageToFrame(tabId, frameId, { type: "ELEMENT_PDF_PING" });
+    await sendMessageToFrame(tabId, frameId, { type: "ELEMENT_TO_PDF_PING" });
     return;
   } catch (_error) {
     await chrome.scripting.executeScript({
@@ -838,7 +838,7 @@ async function captureScrollableElementVisual(sender, crop) {
     );
 
     const initialMetrics = await sendMessageToFrame(tabId, frameId, {
-      type: "ELEMENT_PDF_PREPARE_SCROLL_CAPTURE",
+      type: "ELEMENT_TO_PDF_PREPARE_SCROLL_CAPTURE",
       captureId: crop.captureId
     });
 
@@ -860,7 +860,7 @@ async function captureScrollableElementVisual(sender, crop) {
     const seen = new Set();
     for (const requestedScrollTop of scrollTops) {
       const metrics = await sendMessageToFrame(tabId, frameId, {
-        type: "ELEMENT_PDF_SCROLL_CAPTURE_TO",
+        type: "ELEMENT_TO_PDF_SCROLL_CAPTURE_TO",
         captureId: crop.captureId,
         scrollTop: requestedScrollTop
       });
@@ -904,7 +904,7 @@ async function captureScrollableElementVisual(sender, crop) {
     };
   } finally {
     await sendMessageToFrame(tabId, frameId, {
-      type: "ELEMENT_PDF_RESTORE_SCROLL_CAPTURE",
+      type: "ELEMENT_TO_PDF_RESTORE_SCROLL_CAPTURE",
       captureId: crop.captureId
     }).catch(() => undefined);
 
@@ -1010,7 +1010,7 @@ async function sendExportStatus(job, message, kind) {
       .sendMessage(
         job.sourceTabId,
         {
-          type: "ELEMENT_PDF_EXPORT_STATUS",
+          type: "ELEMENT_TO_PDF_EXPORT_STATUS",
           message,
           kind
         },

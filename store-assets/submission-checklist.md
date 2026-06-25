@@ -2,13 +2,13 @@
 
 ## Package
 
-- Upload ZIP: `dist/element-pdf-extractor-0.1.0.zip`
+- Upload ZIP: `dist/element-to-pdf-0.1.0.zip`
 - Manifest version: MV3
 - Version: `0.1.0`
 
 ## Listing
 
-- Name: `Element PDF Extractor`
+- Name: `element-to-pdf`
 - Category: `Productivity`
 - Language: `English`
 - Support URL: `https://github.com/MuuiGong/element-to-pdf/issues`
@@ -17,7 +17,7 @@
 ## Graphic assets
 
 - Extension icons are included in `icons/`
-- Screenshot: `store-assets/screenshots/element-pdf-sidepanel-1280x800.png`
+- Screenshot: `store-assets/screenshots/element-to-pdf-sidepanel-1280x800.png`
 
 ## Privacy tab
 

@@ -7,7 +7,7 @@
 
   globalThis.__elementPdfExtractorContentScriptVersion = CONTENT_SCRIPT_VERSION;
 
-  const DEVTOOLS_EXPORT_EVENT = "__ELEMENT_PDF_DEVTOOLS_EXPORT__";
+  const DEVTOOLS_EXPORT_EVENT = "__ELEMENT_TO_PDF_DEVTOOLS_EXPORT__";
   const MAX_CAPTURE_WIDTH = 19200;
   const MAX_CAPTURE_HEIGHT = 19200;
   const MAX_EMBEDDED_ASSET_BYTES = 12 * 1024 * 1024;
@@ -167,18 +167,18 @@
       return false;
     }
 
-    if (message.type === "ELEMENT_PDF_PING") {
+    if (message.type === "ELEMENT_TO_PDF_PING") {
       sendResponse({ ok: true });
       return false;
     }
 
-    if (message.type === "ELEMENT_PDF_START_PICKER") {
+    if (message.type === "ELEMENT_TO_PDF_START_PICKER") {
       startPicker(message.mode === "select" ? "select" : "export");
       sendResponse({ ok: true });
       return false;
     }
 
-    if (message.type === "ELEMENT_PDF_STOP_PICKER") {
+    if (message.type === "ELEMENT_TO_PDF_STOP_PICKER") {
       stopPicker();
       selectedElement = null;
       clearAllOverlays();
@@ -186,7 +186,7 @@
       return false;
     }
 
-    if (message.type === "ELEMENT_PDF_CLEAR_PICKER_OVERLAY") {
+    if (message.type === "ELEMENT_TO_PDF_CLEAR_PICKER_OVERLAY") {
       if (pickerActive) {
         hoverTarget = null;
         clearHoverOverlay();
@@ -195,13 +195,13 @@
       return false;
     }
 
-    if (message.type === "ELEMENT_PDF_EXPORT_STATUS") {
+    if (message.type === "ELEMENT_TO_PDF_EXPORT_STATUS") {
       showToast(message.message || "PDF export status changed.", message.kind || "info");
       sendResponse({ ok: true });
       return false;
     }
 
-    if (message.type === "ELEMENT_PDF_GET_DOM_TREE") {
+    if (message.type === "ELEMENT_TO_PDF_GET_DOM_TREE") {
       const result = buildDomTreeSnapshot();
       sendResponse({
         ok: true,
@@ -213,7 +213,7 @@
       return false;
     }
 
-    if (message.type === "ELEMENT_PDF_HIGHLIGHT_NODE") {
+    if (message.type === "ELEMENT_TO_PDF_HIGHLIGHT_NODE") {
       try {
         const element = getRegisteredElement(message.nodeId);
         if (message.scrollIntoView) {
@@ -230,18 +230,18 @@
       return false;
     }
 
-    if (message.type === "ELEMENT_PDF_CLEAR_HIGHLIGHT") {
+    if (message.type === "ELEMENT_TO_PDF_CLEAR_HIGHLIGHT") {
       clearHoverOverlay();
       sendResponse({ ok: true });
       return false;
     }
 
-    if (message.type === "ELEMENT_PDF_EXPORT_NODE") {
+    if (message.type === "ELEMENT_TO_PDF_EXPORT_NODE") {
       exportRegisteredElement(message.nodeId).then(sendResponse);
       return true;
     }
 
-    if (message.type === "ELEMENT_PDF_SELECT_NODE") {
+    if (message.type === "ELEMENT_TO_PDF_SELECT_NODE") {
       try {
         const element = getRegisteredElement(message.nodeId);
         selectedElement = element;
@@ -256,12 +256,12 @@
       return false;
     }
 
-    if (message.type === "ELEMENT_PDF_EXPORT_SELECTION") {
+    if (message.type === "ELEMENT_TO_PDF_EXPORT_SELECTION") {
       exportSelection(message.options).then(sendResponse);
       return true;
     }
 
-    if (message.type === "ELEMENT_PDF_GET_SELECTION_INFO") {
+    if (message.type === "ELEMENT_TO_PDF_GET_SELECTION_INFO") {
       if (selectedElement && selectedElement.isConnected) {
         sendResponse({ ok: true, info: getSelectionInfo(selectedElement) });
       } else {
@@ -270,30 +270,30 @@
       return false;
     }
 
-    if (message.type === "ELEMENT_PDF_PREPARE_SOURCE_PRINT") {
+    if (message.type === "ELEMENT_TO_PDF_PREPARE_SOURCE_PRINT") {
       prepareSourcePrint(message.sourcePrintId).then(sendResponse);
       return true;
     }
 
-    if (message.type === "ELEMENT_PDF_RESTORE_SOURCE_PRINT") {
+    if (message.type === "ELEMENT_TO_PDF_RESTORE_SOURCE_PRINT") {
       restoreSourcePrint(message.sourcePrintId);
       sendResponse({ ok: true });
       return false;
     }
 
-    if (message.type === "ELEMENT_PDF_PREPARE_SCROLL_CAPTURE") {
+    if (message.type === "ELEMENT_TO_PDF_PREPARE_SCROLL_CAPTURE") {
       respondWithElementAction(message.captureId, sendResponse, (entry) => {
         return getScrollCaptureMetrics(entry.element);
       });
       return false;
     }
 
-    if (message.type === "ELEMENT_PDF_SCROLL_CAPTURE_TO") {
+    if (message.type === "ELEMENT_TO_PDF_SCROLL_CAPTURE_TO") {
       scrollCaptureTo(message.captureId, message.scrollTop).then(sendResponse);
       return true;
     }
 
-    if (message.type === "ELEMENT_PDF_RESTORE_SCROLL_CAPTURE") {
+    if (message.type === "ELEMENT_TO_PDF_RESTORE_SCROLL_CAPTURE") {
       respondWithElementAction(message.captureId, sendResponse, (entry) => {
         entry.element.scrollTop = entry.originalScrollTop;
         entry.element.scrollLeft = entry.originalScrollLeft;
@@ -420,7 +420,7 @@
 
       const payload = await buildCapturePayload(element, captureMode, options);
       const response = await sendRuntimeMessage({
-        type: "ELEMENT_PDF_SNAPSHOT",
+        type: "ELEMENT_TO_PDF_SNAPSHOT",
         payload
       });
 
@@ -436,7 +436,7 @@
       );
       return response;
     } catch (error) {
-      console.warn("Element PDF: capture failed", error);
+      console.warn("element-to-pdf: capture failed", error);
       showToast(getErrorMessage(error), "error");
       return {
         ok: false,
@@ -562,7 +562,7 @@
     const nodeId = findRegisteredNodeId(element);
 
     sendRuntimeMessage({
-      type: "ELEMENT_PDF_PICKED",
+      type: "ELEMENT_TO_PDF_PICKED",
       nodeId,
       info
     }).catch(() => undefined);
@@ -571,14 +571,14 @@
   }
 
   function notifyPickerDone() {
-    sendRuntimeMessage({ type: "ELEMENT_PDF_PICKER_DONE" }).catch(() => undefined);
+    sendRuntimeMessage({ type: "ELEMENT_TO_PDF_PICKER_DONE" }).catch(() => undefined);
   }
 
   function notifyPickerHover() {
     const now = Date.now();
     if (now - lastPickerHoverNotify < 90) return;
     lastPickerHoverNotify = now;
-    sendRuntimeMessage({ type: "ELEMENT_PDF_PICKER_HOVER" }).catch(() => undefined);
+    sendRuntimeMessage({ type: "ELEMENT_TO_PDF_PICKER_HOVER" }).catch(() => undefined);
   }
 
   function isTopFrame() {
@@ -707,7 +707,7 @@
     sourcePrintRegistry.set(sourcePrintId, {
       element: source,
       cleanup: null,
-      originalTargetAttribute: source.getAttribute("data-element-pdf-source-print")
+      originalTargetAttribute: source.getAttribute("data-element-to-pdf-source-print")
     });
 
     setTimeout(() => {
@@ -770,17 +770,17 @@
         host !== document.documentElement &&
         host !== document.body
       ) {
-        host.setAttribute("data-element-pdf-keep", sourcePrintId);
+        host.setAttribute("data-element-to-pdf-keep", sourcePrintId);
         keptAncestors.push(host);
       }
 
       child = host;
     }
 
-    element.setAttribute("data-element-pdf-source-print", sourcePrintId);
+    element.setAttribute("data-element-to-pdf-source-print", sourcePrintId);
 
     const style = document.createElement("style");
-    style.setAttribute("data-element-pdf-source-print-style", sourcePrintId);
+    style.setAttribute("data-element-to-pdf-source-print-style", sourcePrintId);
     style.textContent = buildSourcePrintCss(sourcePrintId, width, height);
     document.documentElement.append(style);
 
@@ -788,13 +788,13 @@
       style.remove();
 
       for (const ancestor of keptAncestors) {
-        ancestor.removeAttribute("data-element-pdf-keep");
+        ancestor.removeAttribute("data-element-to-pdf-keep");
       }
 
       if (entry.originalTargetAttribute === null) {
-        element.removeAttribute("data-element-pdf-source-print");
+        element.removeAttribute("data-element-to-pdf-source-print");
       } else {
-        element.setAttribute("data-element-pdf-source-print", entry.originalTargetAttribute);
+        element.setAttribute("data-element-to-pdf-source-print", entry.originalTargetAttribute);
       }
 
       for (const record of hiddenSiblings) {
@@ -837,8 +837,8 @@
 
   function buildSourcePrintCss(sourcePrintId, width, height) {
     const id = cssEscape(sourcePrintId);
-    const targetSelector = `[data-element-pdf-source-print="${id}"]`;
-    const keepSelector = `[data-element-pdf-keep="${id}"]`;
+    const targetSelector = `[data-element-to-pdf-source-print="${id}"]`;
+    const keepSelector = `[data-element-to-pdf-keep="${id}"]`;
 
     return `
       @media print {
@@ -912,8 +912,8 @@
           print-color-adjust: exact !important;
         }
 
-        [data-element-pdf-overlay],
-        [data-element-pdf-toast] {
+        [data-element-to-pdf-overlay],
+        [data-element-to-pdf-toast] {
           display: none !important;
           visibility: hidden !important;
         }
@@ -1284,9 +1284,9 @@
     if (!content || content === "none" || content === "normal") return;
     if (computed.getPropertyValue("display") === "none") return;
 
-    const id = clone.getAttribute("data-element-pdf-node") || `n${pseudoRuleCounter += 1}`;
-    clone.setAttribute("data-element-pdf-node", id);
-    pseudoCss.push(`[data-element-pdf-node="${cssEscape(id)}"]${pseudo}{${buildStyleText(computed)}}`);
+    const id = clone.getAttribute("data-element-to-pdf-node") || `n${pseudoRuleCounter += 1}`;
+    clone.setAttribute("data-element-to-pdf-node", id);
+    pseudoCss.push(`[data-element-to-pdf-node="${cssEscape(id)}"]${pseudo}{${buildStyleText(computed)}}`);
   }
 
   function replaceCanvasWithImage(source, clone) {
@@ -1421,7 +1421,7 @@
     }
 
     const pending = fetchAssetDataUrl(absoluteUrl).catch((error) => {
-      console.warn("Element PDF: asset embed failed", absoluteUrl, error);
+      console.warn("element-to-pdf: asset embed failed", absoluteUrl, error);
       return "";
     });
 
@@ -1437,7 +1437,7 @@
     }
 
     const response = await sendRuntimeMessage({
-      type: "ELEMENT_PDF_FETCH_ASSET",
+      type: "ELEMENT_TO_PDF_FETCH_ASSET",
       url
     });
 
@@ -1561,7 +1561,7 @@
     if (overlayHost && overlayBox && overlayLabel && selectionBox) return;
 
     overlayHost = document.createElement("div");
-    overlayHost.setAttribute("data-element-pdf-overlay", "true");
+    overlayHost.setAttribute("data-element-to-pdf-overlay", "true");
     overlayHost.style.all = "initial";
 
     const shadow = overlayHost.attachShadow({ mode: "open" });
@@ -1709,7 +1709,7 @@
     }
 
     toastHost = document.createElement("div");
-    toastHost.setAttribute("data-element-pdf-toast", "true");
+    toastHost.setAttribute("data-element-to-pdf-toast", "true");
     toastHost.style.all = "initial";
 
     const shadow = toastHost.attachShadow({ mode: "open" });
@@ -1758,7 +1758,7 @@
 
   function isExtensionOverlayNode(node) {
     return Boolean(
-      node?.closest?.("[data-element-pdf-overlay], [data-element-pdf-toast]")
+      node?.closest?.("[data-element-to-pdf-overlay], [data-element-to-pdf-toast]")
     );
   }
 

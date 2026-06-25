@@ -2,7 +2,7 @@
 
 ## Name
 
-Element PDF Extractor
+element-to-pdf
 
 ## Short description
 
@@ -10,7 +10,7 @@ Select any page element and export it to a PDF.
 
 ## Detailed description
 
-Element PDF Extractor helps you turn a specific part of a web page into a PDF without printing the entire page.
+element-to-pdf helps you turn a specific part of a web page into a PDF without printing the entire page.
 
 Open the side panel, inspect the DOM tree, select an element, and export only that selected element. You can also start the picker from the right-click context menu and choose an element directly on the page.
 

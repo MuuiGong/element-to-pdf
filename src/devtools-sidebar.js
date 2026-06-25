@@ -41,7 +41,7 @@ async function exportSelectedElement() {
 
   try {
     await sendRuntimeMessage({
-      type: "ELEMENT_PDF_INJECT_ALL_FRAMES",
+      type: "ELEMENT_TO_PDF_INJECT_ALL_FRAMES",
       tabId: chrome.devtools.inspectedWindow.tabId
     });
 
@@ -52,7 +52,7 @@ async function exportSelectedElement() {
         return { ok: false, error: "No element is selected in Elements." };
       }
 
-      const handled = !el.dispatchEvent(new CustomEvent("${"__ELEMENT_PDF_DEVTOOLS_EXPORT__"}", {
+      const handled = !el.dispatchEvent(new CustomEvent("${"__ELEMENT_TO_PDF_DEVTOOLS_EXPORT__"}", {
         bubbles: true,
         composed: true,
         cancelable: true,

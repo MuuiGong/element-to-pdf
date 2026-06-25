@@ -67,7 +67,7 @@ async function init() {
   });
 
   chrome.runtime.onMessage.addListener((message, sender) => {
-    if (message?.type === "ELEMENT_PDF_PICKED") {
+    if (message?.type === "ELEMENT_TO_PDF_PICKED") {
       if (Number.isInteger(activeTabId) && sender?.tab?.id === activeTabId) {
         onPicked(message, sender);
       }
@@ -197,7 +197,7 @@ async function loadActiveTab() {
 
   try {
     const response = await sendRuntimeMessage({
-      type: "ELEMENT_PDF_GET_DOM_TREE_FOR_TAB",
+      type: "ELEMENT_TO_PDF_GET_DOM_TREE_FOR_TAB",
       tabId: tab.id
     });
 
@@ -486,7 +486,7 @@ function markTreeSelection(nodeEl) {
 async function selectInPage(nodeId, scroll) {
   try {
     const response = await sendRuntimeMessage({
-      type: "ELEMENT_PDF_SELECT_NODE_FOR_TAB",
+      type: "ELEMENT_TO_PDF_SELECT_NODE_FOR_TAB",
       tabId: activeTabId,
       nodeId,
       scrollIntoView: scroll
@@ -590,7 +590,7 @@ async function exportSelection() {
 
   try {
     const response = await sendRuntimeMessage({
-      type: "ELEMENT_PDF_EXPORT_SELECTION_FOR_TAB",
+      type: "ELEMENT_TO_PDF_EXPORT_SELECTION_FOR_TAB",
       tabId: activeTabId,
       frameId: selectedFrameId,
       options: exportOptions()
@@ -612,7 +612,7 @@ async function startPicker() {
   try {
     armPicker();
     await sendRuntimeMessage({
-      type: "ELEMENT_PDF_START_PICKER_FOR_TAB",
+      type: "ELEMENT_TO_PDF_START_PICKER_FOR_TAB",
       tabId: activeTabId
     });
     setStatus("Pick mode — click an element on the page.");
@@ -636,7 +636,7 @@ function disarmPicker() {
 function highlight(nodeId, scrollIntoView) {
   if (!activeTabId || !nodeId) return;
   sendRuntimeMessage({
-    type: "ELEMENT_PDF_HIGHLIGHT_NODE_FOR_TAB",
+    type: "ELEMENT_TO_PDF_HIGHLIGHT_NODE_FOR_TAB",
     tabId: activeTabId,
     nodeId,
     scrollIntoView
@@ -646,7 +646,7 @@ function highlight(nodeId, scrollIntoView) {
 function clearPageHighlight() {
   if (!activeTabId) return;
   sendRuntimeMessage({
-    type: "ELEMENT_PDF_CLEAR_HIGHLIGHT_FOR_TAB",
+    type: "ELEMENT_TO_PDF_CLEAR_HIGHLIGHT_FOR_TAB",
     tabId: activeTabId,
     scope: "all"
   }).catch(() => undefined);
@@ -655,7 +655,7 @@ function clearPageHighlight() {
 function clearHoverHighlight() {
   if (!activeTabId) return;
   sendRuntimeMessage({
-    type: "ELEMENT_PDF_CLEAR_HIGHLIGHT_FOR_TAB",
+    type: "ELEMENT_TO_PDF_CLEAR_HIGHLIGHT_FOR_TAB",
     tabId: activeTabId,
     scope: "hover-top"
   }).catch(() => undefined);

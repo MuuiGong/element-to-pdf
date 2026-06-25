@@ -15,7 +15,7 @@ async function loadJob() {
     }
 
     const response = await sendRuntimeMessage({
-      type: "ELEMENT_PDF_GET_JOB",
+      type: "ELEMENT_TO_PDF_GET_JOB",
       jobId
     });
 
@@ -57,7 +57,7 @@ async function loadJob() {
 
     setStatus("Generating PDF automatically...");
     const printResponse = await sendRuntimeMessage({
-      type: "ELEMENT_PDF_PRINT_READY",
+      type: "ELEMENT_TO_PDF_PRINT_READY",
       jobId,
       dimensions
     });
@@ -192,10 +192,10 @@ function showError(error) {
   captureRoot.innerHTML = "";
 
   const panel = document.createElement("section");
-  panel.className = "element-pdf-error";
+  panel.className = "element-to-pdf-error";
 
   const heading = document.createElement("h1");
-  heading.textContent = "Element PDF export failed";
+  heading.textContent = "element-to-pdf export failed";
 
   const details = document.createElement("p");
   details.textContent = error?.message || String(error || "Unknown error.");

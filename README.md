@@ -1,4 +1,4 @@
-# Element PDF Extractor
+# element-to-pdf
 
 Chrome MV3 extension prototype for selecting a page element and exporting that element to PDF.
 
@@ -8,7 +8,7 @@ Chrome MV3 extension prototype for selecting a page element and exporting that e
 - Side panel tree: select a DOM node to highlight it and scroll it into view on the page, then export it as a PDF.
 - Side panel tree: double-click a DOM node to export it immediately. Filter the tree by tag, `#id`, `.class`, or text, and navigate with the arrow keys.
 - Page context menu: right-click a page and choose **Pick element for PDF** to start direct on-page picking.
-- DevTools Elements sidebar: select an element in Elements, then export it from the **Element PDF** sidebar.
+- DevTools Elements sidebar: select an element in Elements, then export it from the **element-to-pdf** sidebar.
 - Normal pages, popup windows, modal overlays, nested frames, `about:blank` frames initiated by a matched page, and newly opened tabs/windows covered by `<all_urls>`.
 
 ## Hard browser limits
