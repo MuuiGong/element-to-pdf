@@ -1,29 +1,48 @@
-# Privacy Policy for element-to-pdf
+# Privacy Policy for Element to PDF
 
 Last updated: June 25, 2026
 
-element-to-pdf is a Chrome extension that lets users select a page element and export it as a PDF.
+Element to PDF is a Chrome extension that lets users select a page element and export the selected element and its descendant content as a PDF.
 
-## Data collection
+## Summary
 
-element-to-pdf does not collect, sell, transfer, or share user data with the developer or any third party.
+Element to PDF does not collect, sell, transfer, or share user data with the developer or any third party. The extension runs locally in the user's browser and does not operate a remote server.
 
-The extension can read the current web page only to provide its core feature: showing an element tree, highlighting elements, and exporting a user-selected element to a PDF. Page content is processed locally in the browser.
+## Page Content
 
-## Data storage
+The extension can read page structure and page content only to provide its core features:
 
-The extension may temporarily store generated print jobs in the browser's local extension storage while preparing a PDF. This temporary data is used only for PDF generation and is deleted after the export flow completes when possible.
+- displaying a DOM tree in the side panel;
+- highlighting elements selected by the user;
+- selecting elements from the page or DevTools;
+- preparing the selected element for PDF export;
+- generating and downloading the PDF.
 
-The extension does not run a remote server and does not upload page content, PDFs, browsing history, or user activity to any external service.
+Page content is processed locally in the browser. It is not uploaded to the developer or to an external service.
+
+## Temporary Storage
+
+The extension may temporarily store export job data in the browser's local extension storage while preparing a PDF. This storage is used only for the PDF generation workflow and is deleted after the export flow completes when possible.
+
+## Downloads
+
+Generated PDFs are saved to the user's computer through Chrome's download system. The extension does not receive or store copies of downloaded PDFs outside the user's browser.
 
 ## Permissions
 
-element-to-pdf requests Chrome permissions only for its element selection and PDF export workflow:
+Element to PDF requests Chrome permissions only for its element selection and PDF export workflow:
 
-- Access to web pages is used to inspect and export user-selected elements.
-- Debugger access is used to call Chrome's built-in PDF generation APIs on the current tab after the user starts an export.
-- Downloads access is used to save the generated PDF.
-- Tabs, scripting, web navigation, side panel, and context menu permissions are used to integrate the picker, side panel, frame support, and right-click workflow.
+- `activeTab`, `tabs`, `scripting`, and host access are used to inspect and interact with pages selected by the user.
+- `sidePanel` is used to show the DOM tree and export controls.
+- `contextMenus` is used to provide the right-click picker.
+- `webNavigation` is used to support accessible frames.
+- `debugger` is used only during export to call Chrome's built-in PDF generation APIs, then detach.
+- `downloads` is used to save the generated PDF.
+- `unlimitedStorage` is used for temporary local export jobs.
+
+## No Remote Code
+
+The extension does not load or execute remote code.
 
 ## Contact
 

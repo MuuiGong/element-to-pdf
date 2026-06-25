@@ -1,24 +1,39 @@
 # Chrome Web Store Review Test Instructions
 
-No account or paid service is required.
+No account, paid service, or external setup is required.
+
+## Side Panel Workflow
 
 1. Install the extension.
-2. Open any normal `https://` web page, such as `https://example.com`.
-3. Click the extension action to open the Chrome side panel.
+2. Open a normal `https://` web page, such as `https://example.com`.
+3. Click the Element to PDF extension icon to open the Chrome side panel.
 4. Wait for the DOM tree to load.
-5. Select a visible element in the tree. The element should highlight on the page.
-6. Click **Export PDF** and choose a save location when prompted.
-7. Verify that a PDF file is downloaded.
+5. Select a visible element in the tree.
+6. Confirm that the selected element is highlighted on the page.
+7. Click **Export PDF**.
+8. Choose a save location when Chrome prompts for the download.
+9. Verify that a PDF file is downloaded.
 
-Additional workflow:
+## Context Menu Workflow
 
-1. Right-click on a normal web page.
-2. Choose **Pick element for PDF**.
-3. Click a visible page element.
-4. Verify that the selected element export flow starts.
+1. Open a normal `https://` web page.
+2. Right-click the page.
+3. Choose **Pick element for PDF**.
+4. Click a visible page element.
+5. Confirm that the selected element is highlighted.
+6. Export the selected element from the side panel.
 
-Known Chrome restrictions:
+## DevTools Workflow
+
+1. Open Chrome DevTools on a normal web page.
+2. Select an element in the Elements panel.
+3. Open the **Element to PDF** sidebar in DevTools.
+4. Click the export control.
+5. Verify that a PDF file is downloaded.
+
+## Known Chrome Restrictions
 
 - The extension cannot run on Chrome system pages such as `chrome://` URLs.
-- The extension cannot run on the Chrome Web Store listing pages.
+- The extension cannot run on Chrome Web Store listing pages.
+- The extension cannot run inside restricted sandboxed frames.
 - Local `file://` pages require file access to be enabled by the user in Chrome extension settings.

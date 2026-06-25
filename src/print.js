@@ -195,7 +195,7 @@ function showError(error) {
   panel.className = "element-to-pdf-error";
 
   const heading = document.createElement("h1");
-  heading.textContent = "element-to-pdf export failed";
+  heading.textContent = "Element to PDF export failed";
 
   const details = document.createElement("p");
   details.textContent = error?.message || String(error || "Unknown error.");
