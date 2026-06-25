@@ -142,6 +142,9 @@
   let overlayHost = null;
   let overlayBox = null;
   let overlayLabel = null;
+  let selectionBox = null;
+  let hoverEl = null;
+  let selectionEl = null;
   let toastHost = null;
   let pseudoRuleCounter = 0;
   let nextDomNodeId = 1;
@@ -149,8 +152,15 @@
   let lastDomTreeTruncated = false;
   let visualCaptureRegistry = new Map();
   let sourcePrintRegistry = new Map();
+  let pickerMode = "export";
+  let selectedElement = null;
+  let lastPickerHoverNotify = 0;
+  let overlayRaf = 0;
 
   document.addEventListener(DEVTOOLS_EXPORT_EVENT, handleDevtoolsExportEvent, true);
+  // Keep the persistent selection/hover boxes aligned when the page scrolls.
+  window.addEventListener("scroll", scheduleOverlayReposition, true);
+  window.addEventListener("resize", scheduleOverlayReposition, true);
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (!message || typeof message !== "object") {
@@ -163,7 +173,24 @@
     }
 
     if (message.type === "ELEMENT_PDF_START_PICKER") {
-      startPicker();
+      startPicker(message.mode === "select" ? "select" : "export");
+      sendResponse({ ok: true });
+      return false;
+    }
+
+    if (message.type === "ELEMENT_PDF_STOP_PICKER") {
+      stopPicker();
+      selectedElement = null;
+      clearAllOverlays();
+      sendResponse({ ok: true });
+      return false;
+    }
+
+    if (message.type === "ELEMENT_PDF_CLEAR_PICKER_OVERLAY") {
+      if (pickerActive) {
+        hoverTarget = null;
+        clearHoverOverlay();
+      }
       sendResponse({ ok: true });
       return false;
     }
@@ -192,7 +219,7 @@
         if (message.scrollIntoView) {
           scrollRegisteredElementIntoView(element);
         }
-        updateOverlay(element);
+        setHoverElement(element);
         sendResponse({ ok: true });
       } catch (error) {
         sendResponse({
@@ -204,7 +231,7 @@
     }
 
     if (message.type === "ELEMENT_PDF_CLEAR_HIGHLIGHT") {
-      updateOverlay(null);
+      clearHoverOverlay();
       sendResponse({ ok: true });
       return false;
     }
@@ -212,6 +239,35 @@
     if (message.type === "ELEMENT_PDF_EXPORT_NODE") {
       exportRegisteredElement(message.nodeId).then(sendResponse);
       return true;
+    }
+
+    if (message.type === "ELEMENT_PDF_SELECT_NODE") {
+      try {
+        const element = getRegisteredElement(message.nodeId);
+        selectedElement = element;
+        if (message.scrollIntoView) {
+          scrollRegisteredElementIntoView(element);
+        }
+        setSelectionElement(element);
+        sendResponse({ ok: true, info: getSelectionInfo(element) });
+      } catch (error) {
+        sendResponse({ ok: false, error: getErrorMessage(error) });
+      }
+      return false;
+    }
+
+    if (message.type === "ELEMENT_PDF_EXPORT_SELECTION") {
+      exportSelection(message.options).then(sendResponse);
+      return true;
+    }
+
+    if (message.type === "ELEMENT_PDF_GET_SELECTION_INFO") {
+      if (selectedElement && selectedElement.isConnected) {
+        sendResponse({ ok: true, info: getSelectionInfo(selectedElement) });
+      } else {
+        sendResponse({ ok: false });
+      }
+      return false;
     }
 
     if (message.type === "ELEMENT_PDF_PREPARE_SOURCE_PRINT") {
@@ -249,14 +305,22 @@
     return false;
   });
 
-  function startPicker() {
+  function startPicker(mode = "export") {
     if (pickerActive) return;
 
+    pickerMode = mode === "select" ? "select" : "export";
     pickerActive = true;
     hoverTarget = null;
     ensureOverlay();
-    updateOverlay(null);
-    showToast("Move over the page and click an element to export. Press Esc to cancel.", "info");
+    clearHoverOverlay();
+    if (isTopFrame()) {
+      showToast(
+        pickerMode === "select"
+          ? "Click an element to select it in the panel. Press Esc to cancel."
+          : "Click an element to export it as PDF. Press Esc to cancel.",
+        "info"
+      );
+    }
 
     document.addEventListener("mousemove", handlePickerMouseMove, true);
     document.addEventListener("mouseover", handlePickerMouseMove, true);
@@ -272,7 +336,7 @@
 
     pickerActive = false;
     hoverTarget = null;
-    updateOverlay(null);
+    clearHoverOverlay();
 
     document.removeEventListener("mousemove", handlePickerMouseMove, true);
     document.removeEventListener("mouseover", handlePickerMouseMove, true);
@@ -290,7 +354,8 @@
     if (!target || isExtensionOverlayNode(target)) return;
 
     hoverTarget = target;
-    updateOverlay(target);
+    setHoverElement(target);
+    notifyPickerHover();
   }
 
   function handlePickerClick(event) {
@@ -301,14 +366,20 @@
     event.stopImmediatePropagation();
 
     const target = hoverTarget || getElementFromEvent(event);
+    const mode = pickerMode;
     stopPicker();
+    notifyPickerDone();
 
     if (!target || isExtensionOverlayNode(target)) {
       showToast("No element was selected.", "error");
       return;
     }
 
-    exportElement(target, "picker");
+    if (mode === "select") {
+      selectPickedElement(target);
+    } else {
+      exportElement(target, "picker");
+    }
   }
 
   function blockPickerContextMenu(event) {
@@ -324,12 +395,13 @@
     event.preventDefault();
     event.stopPropagation();
     stopPicker();
+    notifyPickerDone();
     showToast("Element picker cancelled.", "info");
   }
 
   function handlePickerScrollOrResize() {
     if (!pickerActive || !hoverTarget) return;
-    updateOverlay(hoverTarget);
+    renderOverlays();
   }
 
   function handleDevtoolsExportEvent(event) {
@@ -341,12 +413,12 @@
     exportElement(target, "devtools");
   }
 
-  async function exportElement(element, captureMode) {
+  async function exportElement(element, captureMode, options = null) {
     try {
-      updateOverlay(null);
+      clearHoverOverlay();
       await waitForNextPaint();
 
-      const payload = await buildCapturePayload(element, captureMode);
+      const payload = await buildCapturePayload(element, captureMode, options);
       const response = await sendRuntimeMessage({
         type: "ELEMENT_PDF_SNAPSHOT",
         payload
@@ -482,10 +554,104 @@
     }
   }
 
-  async function buildCapturePayload(source, captureMode) {
+  function selectPickedElement(element) {
+    selectedElement = element;
+    setSelectionElement(element);
+
+    const info = getSelectionInfo(element);
+    const nodeId = findRegisteredNodeId(element);
+
+    sendRuntimeMessage({
+      type: "ELEMENT_PDF_PICKED",
+      nodeId,
+      info
+    }).catch(() => undefined);
+
+    showToast("Selected. Review it in the panel, then export.", "info");
+  }
+
+  function notifyPickerDone() {
+    sendRuntimeMessage({ type: "ELEMENT_PDF_PICKER_DONE" }).catch(() => undefined);
+  }
+
+  function notifyPickerHover() {
+    const now = Date.now();
+    if (now - lastPickerHoverNotify < 90) return;
+    lastPickerHoverNotify = now;
+    sendRuntimeMessage({ type: "ELEMENT_PDF_PICKER_HOVER" }).catch(() => undefined);
+  }
+
+  function isTopFrame() {
+    try {
+      return window.top === window;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function findRegisteredNodeId(element) {
+    for (const [nodeId, node] of domNodeRegistry) {
+      if (node === element) return nodeId;
+    }
+    return null;
+  }
+
+  function describeElement(element) {
+    let label = element.tagName.toLowerCase();
+    if (element.id) {
+      label += `#${element.id}`;
+    } else {
+      label += Array.from(element.classList || [])
+        .slice(0, 2)
+        .map((className) => `.${className}`)
+        .join("");
+    }
+    return label;
+  }
+
+  function getSelectionInfo(element) {
+    const rect = getSourcePrintRect(element);
+    const width = Math.max(1, Math.round(rect.width));
+    const height = Math.max(1, Math.round(rect.height));
+
+    return {
+      label: describeElement(element),
+      selector: getReadableSelector(element),
+      width,
+      height,
+      pages: 1,
+      orientation: width > height ? "landscape" : "portrait"
+    };
+  }
+
+  async function exportSelection(options) {
+    if (!selectedElement || !selectedElement.isConnected) {
+      return {
+        ok: false,
+        error: "No element is selected. Pick or click an element first."
+      };
+    }
+
+    return exportElement(selectedElement, "panel", options);
+  }
+
+  function sanitizeExportOptions(options) {
+    if (!options || typeof options !== "object") return null;
+
+    const clean = {};
+    if (typeof options.background === "boolean") clean.background = options.background;
+    if (typeof options.saveAs === "boolean") clean.saveAs = options.saveAs;
+    if (typeof options.filename === "string" && options.filename.trim()) {
+      clean.filename = options.filename.trim();
+    }
+
+    return Object.keys(clean).length ? clean : null;
+  }
+
+  async function buildCapturePayload(source, captureMode, options = null) {
     pseudoRuleCounter = 0;
 
-    const sourcePrintPayload = buildSourcePrintPayload(source, captureMode);
+    const sourcePrintPayload = buildSourcePrintPayload(source, captureMode, options);
     if (sourcePrintPayload) {
       return sourcePrintPayload;
     }
@@ -533,7 +699,7 @@
     };
   }
 
-  function buildSourcePrintPayload(source, captureMode) {
+  function buildSourcePrintPayload(source, captureMode, options = null) {
     const rect = getSourcePrintRect(source);
     if (!rect || rect.width < 1 || rect.height < 1) return null;
 
@@ -558,6 +724,7 @@
       sourceUrl: location.href,
       selector: getReadableSelector(source),
       sourcePrintId,
+      options: sanitizeExportOptions(options),
       width: clampDimension(rect.width, MAX_CAPTURE_WIDTH),
       height: clampDimension(rect.height, MAX_CAPTURE_HEIGHT)
     };
@@ -1391,7 +1558,7 @@
   }
 
   function ensureOverlay() {
-    if (overlayHost && overlayBox && overlayLabel) return;
+    if (overlayHost && overlayBox && overlayLabel && selectionBox) return;
 
     overlayHost = document.createElement("div");
     overlayHost.setAttribute("data-element-pdf-overlay", "true");
@@ -1404,15 +1571,23 @@
           all: initial;
         }
 
+        .sel,
         .box {
           position: fixed;
           z-index: 2147483647;
           pointer-events: none;
-          border: 2px solid #1769ff;
-          background: rgba(23, 105, 255, 0.12);
-          box-shadow: 0 0 0 99999px rgba(12, 18, 28, 0.18);
           box-sizing: border-box;
           display: none;
+        }
+
+        .sel {
+          border: 2px solid #1a73e8;
+          background: rgba(26, 115, 232, 0.10);
+        }
+
+        .box {
+          border: 1px dashed #1a73e8;
+          background: rgba(26, 115, 232, 0.05);
         }
 
         .label {
@@ -1420,9 +1595,9 @@
           z-index: 2147483647;
           pointer-events: none;
           max-width: min(420px, calc(100vw - 24px));
-          padding: 5px 8px;
+          padding: 4px 7px;
           border-radius: 4px;
-          background: #1769ff;
+          background: #1a73e8;
           color: white;
           font: 12px/1.4 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
           white-space: nowrap;
@@ -1431,24 +1606,18 @@
           display: none;
         }
       </style>
+      <div class="sel"></div>
       <div class="box"></div>
       <div class="label"></div>
     `;
 
+    selectionBox = shadow.querySelector(".sel");
     overlayBox = shadow.querySelector(".box");
     overlayLabel = shadow.querySelector(".label");
     document.documentElement.append(overlayHost);
   }
 
-  function updateOverlay(target) {
-    if (!overlayBox || !overlayLabel) return;
-
-    if (!target) {
-      overlayBox.style.display = "none";
-      overlayLabel.style.display = "none";
-      return;
-    }
-
+  function positionBox(box, target) {
     const rect = target.getBoundingClientRect();
     const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
     const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
@@ -1456,19 +1625,70 @@
     const top = Math.max(0, Math.min(rect.top, viewportHeight));
     const right = Math.max(0, Math.min(rect.right, viewportWidth));
     const bottom = Math.max(0, Math.min(rect.bottom, viewportHeight));
-    const width = Math.max(0, right - left);
-    const height = Math.max(0, bottom - top);
 
-    overlayBox.style.display = "block";
-    overlayBox.style.left = `${left}px`;
-    overlayBox.style.top = `${top}px`;
-    overlayBox.style.width = `${width}px`;
-    overlayBox.style.height = `${height}px`;
+    box.style.display = "block";
+    box.style.left = `${left}px`;
+    box.style.top = `${top}px`;
+    box.style.width = `${Math.max(0, right - left)}px`;
+    box.style.height = `${Math.max(0, bottom - top)}px`;
 
-    overlayLabel.textContent = getElementLabel(target);
-    overlayLabel.style.display = "block";
-    overlayLabel.style.left = `${Math.min(left, viewportWidth - 16)}px`;
-    overlayLabel.style.top = `${Math.max(8, top - 30)}px`;
+    return { left, top };
+  }
+
+  // Two independent layers: a persistent "selection" box (solid) and a
+  // transient "hover" box (dashed). Hovering a different node never disturbs
+  // the current selection — they no longer fight over a single overlay.
+  function renderOverlays() {
+    ensureOverlay();
+
+    if (selectionEl && selectionEl.isConnected) {
+      positionBox(selectionBox, selectionEl);
+    } else {
+      selectionBox.style.display = "none";
+    }
+
+    if (hoverEl && hoverEl.isConnected && hoverEl !== selectionEl) {
+      const pos = positionBox(overlayBox, hoverEl);
+      const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+      overlayLabel.textContent = getElementLabel(hoverEl);
+      overlayLabel.style.display = "block";
+      overlayLabel.style.left = `${Math.min(pos.left, viewportWidth - 16)}px`;
+      overlayLabel.style.top = `${Math.max(8, pos.top - 28)}px`;
+    } else {
+      overlayBox.style.display = "none";
+      overlayLabel.style.display = "none";
+    }
+  }
+
+  function setHoverElement(target) {
+    hoverEl = target && target !== selectionEl ? target : null;
+    renderOverlays();
+  }
+
+  function setSelectionElement(target) {
+    selectionEl = target || null;
+    if (hoverEl === selectionEl) hoverEl = null;
+    renderOverlays();
+  }
+
+  function clearHoverOverlay() {
+    hoverEl = null;
+    renderOverlays();
+  }
+
+  function clearAllOverlays() {
+    hoverEl = null;
+    selectionEl = null;
+    renderOverlays();
+  }
+
+  function scheduleOverlayReposition() {
+    if (!hoverEl && !selectionEl) return;
+    if (overlayRaf) return;
+    overlayRaf = requestAnimationFrame(() => {
+      overlayRaf = 0;
+      renderOverlays();
+    });
   }
 
   function showToast(message, kind) {

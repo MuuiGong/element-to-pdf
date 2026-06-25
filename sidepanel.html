@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Element PDF</title>
-    <link rel="stylesheet" href="src/sidepanel.css?v=4" />
+    <link rel="stylesheet" href="src/sidepanel.css?v=9" />
   </head>
   <body>
     <div class="app">
@@ -16,6 +16,13 @@
           </div>
         </div>
         <div class="top-actions">
+          <button class="ghost-btn icon-only" id="help" type="button" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M9.6 9.7a2.4 2.4 0 0 1 4.65.8c0 1.6-2.4 2.1-2.4 2.1" />
+              <path d="M12 17h.01" />
+            </svg>
+          </button>
           <button class="ghost-btn pick-btn" id="pick" type="button" title="Pick an element on the page (P)">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M21 11V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6" />
@@ -40,7 +47,13 @@
           <path d="m21 21-4.3-4.3" />
         </svg>
         <input id="search" type="search" placeholder="Filter DOM" autocomplete="off" spellcheck="false" />
-        <kbd class="search-key">/</kbd>
+        <span class="search-count" id="search-count" hidden></span>
+        <button class="search-clear" id="search-clear" type="button" title="Clear filter" aria-label="Clear filter" hidden>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+        <kbd class="search-key" id="search-key">/</kbd>
       </div>
 
       <main class="tree-wrap">
@@ -53,8 +66,39 @@
 
       <footer class="actionbar">
         <nav class="crumbs" id="crumbs" aria-label="Selected element path"></nav>
+
+        <div class="selinfo" id="selinfo" hidden>
+          <span class="selinfo-main" id="selinfo-main"></span>
+          <span class="selinfo-dim" id="selinfo-dim"></span>
+        </div>
+
+        <div class="opts" id="opts" hidden>
+          <label class="opt">
+            <span>File name</span>
+            <input id="opt-filename" type="text" placeholder="auto (page title)" spellcheck="false" />
+          </label>
+          <label class="opt opt-check">
+            <input id="opt-bg" type="checkbox" checked />
+            <span>Print background graphics</span>
+          </label>
+          <label class="opt opt-check">
+            <input id="opt-saveas" type="checkbox" checked />
+            <span>Ask where to save</span>
+          </label>
+          <label class="opt opt-check">
+            <input id="opt-eop" type="checkbox" />
+            <span>Export immediately on pick</span>
+          </label>
+        </div>
+
         <div class="footer-row">
           <span class="status" id="status" role="status"></span>
+          <button class="ghost-btn icon-only" id="opts-toggle" type="button" title="Export options" aria-label="Export options" aria-expanded="false">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
           <button class="export-btn" id="export" type="button" disabled>
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" />
@@ -66,8 +110,22 @@
           </button>
         </div>
       </footer>
+
+      <div class="popover" id="help-pop" role="dialog" aria-label="Keyboard shortcuts" hidden>
+        <div class="pop-title">Shortcuts</div>
+        <ul class="pop-list">
+          <li><span class="pop-keys"><kbd>↑</kbd><kbd>↓</kbd></span><span>Move selection</span></li>
+          <li><span class="pop-keys"><kbd>→</kbd><kbd>←</kbd></span><span>Expand / collapse</span></li>
+          <li><span class="pop-keys"><kbd>↵</kbd></span><span>Export selected</span></li>
+          <li><span class="pop-keys"><kbd>P</kbd></span><span>Pick on page</span></li>
+          <li><span class="pop-keys"><kbd>R</kbd></span><span>Refresh tree</span></li>
+          <li><span class="pop-keys"><kbd>/</kbd></span><span>Filter the tree</span></li>
+          <li><span class="pop-keys"><kbd>Esc</kbd></span><span>Clear selection</span></li>
+          <li><span class="pop-keys">2×</span><span>Double-click a node to export</span></li>
+        </ul>
+      </div>
     </div>
 
-    <script src="src/sidepanel.js?v=4"></script>
+    <script src="src/sidepanel.js?v=8"></script>
   </body>
 </html>

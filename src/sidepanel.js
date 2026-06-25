@@ -7,15 +7,34 @@ const hostNode = document.getElementById("page-url");
 const statusNode = document.getElementById("status");
 const crumbsNode = document.getElementById("crumbs");
 const searchInput = document.getElementById("search");
+const searchCount = document.getElementById("search-count");
+const searchClear = document.getElementById("search-clear");
+const searchKey = document.getElementById("search-key");
 const pickButton = document.getElementById("pick");
 const refreshButton = document.getElementById("refresh");
 const exportButton = document.getElementById("export");
+const helpButton = document.getElementById("help");
+const helpPop = document.getElementById("help-pop");
+const selinfoNode = document.getElementById("selinfo");
+const selinfoMain = document.getElementById("selinfo-main");
+const selinfoDim = document.getElementById("selinfo-dim");
+const optsToggle = document.getElementById("opts-toggle");
+const optsNode = document.getElementById("opts");
+const optFilename = document.getElementById("opt-filename");
+const optBg = document.getElementById("opt-bg");
+const optSaveAs = document.getElementById("opt-saveas");
+const optEop = document.getElementById("opt-eop");
+
+const OPTIONS_KEY = "epdfOptions";
+const SEEN_KEY = "epdfSeen";
 
 const nodeElements = new Map();
 
 let panelWindowId = null;
 let activeTabId = null;
 let selectedNodeId = null;
+let selectedFrameId = 0;
+let hasSelection = false;
 let lastHoverId = null;
 let pickArmed = false;
 let loadToken = 0;
@@ -30,6 +49,7 @@ async function init() {
     panelWindowId = null;
   }
 
+  loadOptions();
   wireEvents();
   await loadActiveTab();
 
@@ -45,23 +65,35 @@ async function init() {
       loadActiveTab();
     }
   });
+
+  chrome.runtime.onMessage.addListener((message, sender) => {
+    if (message?.type === "ELEMENT_PDF_PICKED") {
+      if (Number.isInteger(activeTabId) && sender?.tab?.id === activeTabId) {
+        onPicked(message, sender);
+      }
+    }
+    return false;
+  });
 }
 
 function wireEvents() {
   refreshButton.addEventListener("click", () => loadActiveTab());
   pickButton.addEventListener("click", startPicker);
-  exportButton.addEventListener("click", () => {
-    if (selectedNodeId) exportNode(selectedNodeId);
+  exportButton.addEventListener("click", () => exportSelection());
+
+  searchInput.addEventListener("input", () => onSearchInput());
+  searchClear.addEventListener("click", () => {
+    searchInput.value = "";
+    onSearchInput();
+    searchInput.focus();
   });
-  searchInput.addEventListener("input", () => applyFilter(searchInput.value));
 
   treeNode.addEventListener("click", onTreeClick);
   treeNode.addEventListener("dblclick", onTreeDblClick);
   treeNode.addEventListener("mouseover", onTreeHover);
   treeNode.addEventListener("mouseleave", () => {
     lastHoverId = null;
-    if (selectedNodeId) highlight(selectedNodeId, false);
-    else clearPageHighlight();
+    clearHoverHighlight();
   });
 
   crumbsNode.addEventListener("click", (event) => {
@@ -69,9 +101,62 @@ function wireEvents() {
     if (crumb?.dataset.nodeId) selectNodeById(crumb.dataset.nodeId, { scroll: true });
   });
 
+  optsToggle.addEventListener("click", toggleOptions);
+  helpButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    helpPop.hidden = !helpPop.hidden;
+  });
+  document.addEventListener("click", (event) => {
+    if (helpPop.hidden) return;
+    if (helpPop.contains(event.target) || helpButton.contains(event.target)) return;
+    helpPop.hidden = true;
+  });
+
+  for (const input of [optBg, optSaveAs, optEop, optFilename]) {
+    input.addEventListener("change", saveOptions);
+  }
+
   window.addEventListener("focus", disarmPicker);
   window.addEventListener("unload", clearPageHighlight);
   document.addEventListener("keydown", onKeyDown, true);
+}
+
+/* ---------- options ---------- */
+
+function loadOptions() {
+  chrome.storage?.local?.get(OPTIONS_KEY, (result) => {
+    const saved = result?.[OPTIONS_KEY];
+    if (!saved || typeof saved !== "object") return;
+    if (typeof saved.background === "boolean") optBg.checked = saved.background;
+    if (typeof saved.saveAs === "boolean") optSaveAs.checked = saved.saveAs;
+    if (typeof saved.exportOnPick === "boolean") optEop.checked = saved.exportOnPick;
+    if (typeof saved.filename === "string") optFilename.value = saved.filename;
+  });
+}
+
+function saveOptions() {
+  chrome.storage?.local?.set({
+    [OPTIONS_KEY]: {
+      background: optBg.checked,
+      saveAs: optSaveAs.checked,
+      exportOnPick: optEop.checked,
+      filename: optFilename.value.trim()
+    }
+  });
+}
+
+function exportOptions() {
+  return {
+    background: optBg.checked,
+    saveAs: optSaveAs.checked,
+    filename: optFilename.value.trim()
+  };
+}
+
+function toggleOptions() {
+  const willOpen = optsNode.hidden;
+  optsNode.hidden = !willOpen;
+  optsToggle.setAttribute("aria-expanded", String(willOpen));
 }
 
 /* ---------- tab + tree loading ---------- */
@@ -123,14 +208,25 @@ async function loadActiveTab() {
     }
 
     renderTreeRoot(response.tree, response.truncated);
-    setStatus(
-      response.truncated ? "Large DOM — tree was truncated." : "",
-      response.truncated ? "warn" : ""
-    );
+
+    if (response.truncated) {
+      setStatus("Large DOM — tree was truncated.", "warn");
+    } else {
+      setStatus("");
+      maybeFirstRunTip();
+    }
   } catch (error) {
     if (token !== loadToken) return;
     showEmpty("Couldn't read this page", getErrorMessage(error));
   }
+}
+
+function maybeFirstRunTip() {
+  chrome.storage?.local?.get(SEEN_KEY, (result) => {
+    if (result?.[SEEN_KEY]) return;
+    setStatus("Tip: click a node or Pick on the page, then Export. Press the ? for shortcuts.");
+    chrome.storage?.local?.set({ [SEEN_KEY]: true });
+  });
 }
 
 function renderTreeRoot(tree, truncated) {
@@ -138,7 +234,7 @@ function renderTreeRoot(tree, truncated) {
   clearSelection();
   treeNode.textContent = "";
   searchInput.value = "";
-  treeNode.classList.remove("filtering");
+  onSearchInput();
 
   if (!tree) {
     showEmpty("Empty page", "Nothing to show for this document.");
@@ -154,11 +250,6 @@ function renderTreeRoot(tree, truncated) {
   }
 
   emptyNode.hidden = true;
-  treeNode.hidden = false;
-  // restart the entrance animation
-  treeNode.style.animation = "none";
-  void treeNode.offsetWidth;
-  treeNode.style.animation = "";
 }
 
 /* ---------- node rendering ---------- */
@@ -308,7 +399,7 @@ function crumbText(node) {
   return first ? `${node.tagName}.${first}` : node.tagName || "node";
 }
 
-/* ---------- interactions ---------- */
+/* ---------- tree interactions ---------- */
 
 function onTreeClick(event) {
   const twisty = event.target.closest(".twisty");
@@ -324,11 +415,12 @@ function onTreeClick(event) {
   }
 }
 
-function onTreeDblClick(event) {
+async function onTreeDblClick(event) {
   const row = event.target.closest(".row");
   const nodeEl = row?.parentElement;
   if (nodeEl?.dataset.nodeId && nodeEl.dataset.kind !== "shadow") {
-    exportNode(nodeEl.dataset.nodeId);
+    await selectNode(nodeEl.dataset.nodeId, nodeEl, { scroll: true });
+    exportSelection();
   }
 }
 
@@ -347,29 +439,20 @@ function toggleNode(nodeEl) {
   nodeEl.setAttribute("aria-expanded", collapsed ? "false" : "true");
 }
 
+/* ---------- selection ---------- */
+
 function selectNodeById(nodeId, options = {}) {
   const nodeEl = nodeElements.get(nodeId);
   if (nodeEl) selectNode(nodeId, nodeEl, options);
 }
 
-function selectNode(nodeId, nodeEl, options = {}) {
-  if (selectedNodeId) {
-    nodeElements.get(selectedNodeId)?.classList.remove("selected");
-  }
-  treeNode.querySelectorAll(".node.on-path").forEach((el) => el.classList.remove("on-path"));
+async function selectNode(nodeId, nodeEl, options = {}) {
+  markTreeSelection(nodeEl);
 
   selectedNodeId = nodeId;
-  nodeEl.classList.add("selected");
+  selectedFrameId = 0;
+  hasSelection = true;
   exportButton.disabled = false;
-
-  // reveal: expand every ancestor so the row is visible
-  for (let parent = nodeEl.parentElement; parent; parent = parent.parentElement) {
-    if (parent.classList?.contains("node")) {
-      parent.classList.remove("collapsed");
-      parent.setAttribute("aria-expanded", "true");
-      parent.classList.add("on-path");
-    }
-  }
 
   buildCrumbs(nodeEl);
 
@@ -377,7 +460,76 @@ function selectNode(nodeId, nodeEl, options = {}) {
     nodeEl.querySelector(".row")?.scrollIntoView({ block: "nearest" });
   }
 
-  highlight(nodeId, true);
+  if (options.knownInfo) showSelInfo(options.knownInfo);
+
+  const info = await selectInPage(nodeId, options.scroll !== false);
+  if (info) showSelInfo(info);
+  return info;
+}
+
+function markTreeSelection(nodeEl) {
+  if (selectedNodeId) {
+    nodeElements.get(selectedNodeId)?.classList.remove("selected");
+  }
+  treeNode.querySelectorAll(".node.on-path").forEach((el) => el.classList.remove("on-path"));
+
+  nodeEl.classList.add("selected");
+  for (let parent = nodeEl.parentElement; parent; parent = parent.parentElement) {
+    if (parent.classList?.contains("node")) {
+      parent.classList.remove("collapsed");
+      parent.setAttribute("aria-expanded", "true");
+      parent.classList.add("on-path");
+    }
+  }
+}
+
+async function selectInPage(nodeId, scroll) {
+  try {
+    const response = await sendRuntimeMessage({
+      type: "ELEMENT_PDF_SELECT_NODE_FOR_TAB",
+      tabId: activeTabId,
+      nodeId,
+      scrollIntoView: scroll
+    });
+    return response?.ok ? response.info : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function onPicked(message, sender) {
+  disarmPicker();
+  const info = message.info || null;
+  const nodeId = message.nodeId || null;
+  selectedFrameId = Number.isInteger(sender?.frameId) ? sender.frameId : 0;
+
+  if (nodeId && nodeElements.has(nodeId)) {
+    selectNode(nodeId, nodeElements.get(nodeId), { scroll: true, knownInfo: info });
+  } else {
+    if (selectedNodeId) {
+      nodeElements.get(selectedNodeId)?.classList.remove("selected");
+    }
+    treeNode.querySelectorAll(".node.on-path").forEach((el) => el.classList.remove("on-path"));
+    selectedNodeId = null;
+    crumbsNode.textContent = "";
+    hasSelection = true;
+    exportButton.disabled = false;
+    if (info) showSelInfo(info);
+    setStatus(`Selected ${info?.label || "element"} (outside the loaded tree)`);
+  }
+
+  if (optEop.checked) exportSelection();
+}
+
+function showSelInfo(info) {
+  if (!info) {
+    selinfoNode.hidden = true;
+    return;
+  }
+  selinfoMain.textContent = info.label || info.selector || "element";
+  const pages = info.pages > 1 ? `${info.pages} pages` : "1 page";
+  selinfoDim.textContent = `${info.width}×${info.height}px · ${pages}`;
+  selinfoNode.hidden = false;
 }
 
 function buildCrumbs(nodeEl) {
@@ -400,8 +552,7 @@ function buildCrumbs(nodeEl) {
     if (index < shown.length - 1) crumbsNode.appendChild(crumbSep());
   });
 
-  const last = crumbsNode.querySelector(".crumb.is-last");
-  last?.scrollIntoView({ inline: "end", block: "nearest" });
+  crumbsNode.querySelector(".crumb.is-last")?.scrollIntoView({ inline: "end", block: "nearest" });
 }
 
 function crumbChip(text, nodeId, isLast = false) {
@@ -422,32 +573,38 @@ function clearSelection() {
   }
   treeNode.querySelectorAll(".node.on-path").forEach((el) => el.classList.remove("on-path"));
   selectedNodeId = null;
+  selectedFrameId = 0;
+  hasSelection = false;
   exportButton.disabled = true;
   crumbsNode.textContent = "";
+  selinfoNode.hidden = true;
 }
 
 /* ---------- actions ---------- */
 
-async function exportNode(nodeId) {
+async function exportSelection() {
+  if (!hasSelection) return;
+
   setStatus("Exporting selected element…");
   exportButton.disabled = true;
 
   try {
     const response = await sendRuntimeMessage({
-      type: "ELEMENT_PDF_EXPORT_NODE_FOR_TAB",
+      type: "ELEMENT_PDF_EXPORT_SELECTION_FOR_TAB",
       tabId: activeTabId,
-      nodeId
+      frameId: selectedFrameId,
+      options: exportOptions()
     });
 
     if (!response?.ok) {
       throw new Error(response?.error || "Could not export the selected element.");
     }
 
-    setStatus("PDF ready — save dialog opened.", "ok");
+    setStatus(optSaveAs.checked ? "PDF ready — save dialog opened." : "PDF saved to Downloads.", "ok");
   } catch (error) {
     setStatus(getErrorMessage(error), "error");
   } finally {
-    exportButton.disabled = selectedNodeId == null;
+    exportButton.disabled = !hasSelection;
   }
 }
 
@@ -490,20 +647,38 @@ function clearPageHighlight() {
   if (!activeTabId) return;
   sendRuntimeMessage({
     type: "ELEMENT_PDF_CLEAR_HIGHLIGHT_FOR_TAB",
-    tabId: activeTabId
+    tabId: activeTabId,
+    scope: "all"
+  }).catch(() => undefined);
+}
+
+function clearHoverHighlight() {
+  if (!activeTabId) return;
+  sendRuntimeMessage({
+    type: "ELEMENT_PDF_CLEAR_HIGHLIGHT_FOR_TAB",
+    tabId: activeTabId,
+    scope: "hover-top"
   }).catch(() => undefined);
 }
 
 /* ---------- search filter ---------- */
 
+function onSearchInput() {
+  const value = searchInput.value;
+  const has = value.trim().length > 0;
+  searchClear.hidden = !has;
+  searchKey.hidden = has;
+  applyFilter(value);
+}
+
 function applyFilter(rawQuery) {
   const query = rawQuery.trim().toLowerCase();
+  unmarkLabels();
 
   if (!query) {
     treeNode.classList.remove("filtering");
-    treeNode.querySelectorAll(".node.filtered-out").forEach((el) => {
-      el.classList.remove("filtered-out");
-    });
+    treeNode.querySelectorAll(".node.filtered-out").forEach((el) => el.classList.remove("filtered-out"));
+    searchCount.hidden = true;
     return;
   }
 
@@ -511,8 +686,11 @@ function applyFilter(rawQuery) {
   const allNodes = treeNode.querySelectorAll(".node");
   allNodes.forEach((el) => el.classList.add("filtered-out"));
 
+  let matches = 0;
   for (const el of allNodes) {
     if (!(el.dataset.search || "").includes(query)) continue;
+    matches += 1;
+    markLabel(el.querySelector(":scope > .row > .label"), query);
 
     for (let cursor = el; cursor; cursor = cursor.parentElement) {
       if (!cursor.classList?.contains("node")) continue;
@@ -523,17 +701,74 @@ function applyFilter(rawQuery) {
       }
     }
   }
+
+  searchCount.hidden = false;
+  searchCount.textContent = String(matches);
+  searchCount.classList.toggle("none", matches === 0);
+}
+
+function markLabel(labelEl, query) {
+  if (!labelEl) return;
+  for (const sp of labelEl.children) {
+    const original = sp.textContent;
+    const lower = original.toLowerCase();
+    if (!lower.includes(query)) continue;
+
+    sp.dataset.o = original;
+    sp.textContent = "";
+    let index = 0;
+    let found;
+    while ((found = lower.indexOf(query, index)) !== -1) {
+      if (found > index) sp.appendChild(document.createTextNode(original.slice(index, found)));
+      const mark = document.createElement("mark");
+      mark.textContent = original.slice(found, found + query.length);
+      sp.appendChild(mark);
+      index = found + query.length;
+    }
+    if (index < original.length) sp.appendChild(document.createTextNode(original.slice(index)));
+  }
+}
+
+function unmarkLabels() {
+  treeNode.querySelectorAll(".label span[data-o]").forEach((sp) => {
+    sp.textContent = sp.dataset.o;
+    delete sp.dataset.o;
+  });
+}
+
+function selectFirstMatch() {
+  const query = searchInput.value.trim().toLowerCase();
+  if (!query) return;
+
+  const match = Array.from(treeNode.querySelectorAll(".node")).find((el) => {
+    return el.dataset.kind !== "shadow"
+      && (el.dataset.search || "").includes(query)
+      && el.querySelector(":scope > .row")?.offsetParent !== null;
+  });
+
+  if (match) {
+    selectNode(match.dataset.nodeId, match, { scroll: true });
+    searchInput.blur();
+  }
 }
 
 /* ---------- keyboard ---------- */
 
 function onKeyDown(event) {
-  const inField = event.target === searchInput;
+  const inField = event.target === searchInput || event.target === optFilename;
 
   if (event.key === "Escape") {
+    if (!helpPop.hidden) {
+      helpPop.hidden = true;
+      return;
+    }
+    if (!optsNode.hidden) {
+      toggleOptions();
+      return;
+    }
     if (inField && searchInput.value) {
       searchInput.value = "";
-      applyFilter("");
+      onSearchInput();
     } else {
       searchInput.blur();
       clearSelection();
@@ -542,7 +777,19 @@ function onKeyDown(event) {
     return;
   }
 
-  if (inField) return;
+  if (inField) {
+    if (event.key === "Enter" && event.target === searchInput) {
+      event.preventDefault();
+      selectFirstMatch();
+    }
+    return;
+  }
+
+  if (event.key === "?") {
+    event.preventDefault();
+    helpPop.hidden = !helpPop.hidden;
+    return;
+  }
 
   if (event.key === "/") {
     event.preventDefault();
@@ -564,9 +811,9 @@ function onKeyDown(event) {
   }
 
   if (event.key === "Enter") {
-    if (selectedNodeId) {
+    if (hasSelection) {
       event.preventDefault();
-      exportNode(selectedNodeId);
+      exportSelection();
     }
     return;
   }

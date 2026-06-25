@@ -136,13 +136,43 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "ELEMENT_PDF_CLEAR_HIGHLIGHT_FOR_TAB") {
+  if (message.type === "ELEMENT_PDF_SELECT_NODE_FOR_TAB") {
     withAsyncResponse(sendResponse, async () => {
       const tabId = validateTabId(message.tabId);
       await ensureContentScript(tabId, 0);
+      stopPickerInOtherFrames(tabId, 0);
       return sendMessageToFrame(tabId, 0, {
-        type: "ELEMENT_PDF_CLEAR_HIGHLIGHT"
+        type: "ELEMENT_PDF_SELECT_NODE",
+        nodeId: message.nodeId,
+        scrollIntoView: message.scrollIntoView === true
       });
+    });
+    return true;
+  }
+
+  if (message.type === "ELEMENT_PDF_EXPORT_SELECTION_FOR_TAB") {
+    withAsyncResponse(sendResponse, async () => {
+      const tabId = validateTabId(message.tabId);
+      const frameId = Number.isInteger(message.frameId) ? message.frameId : 0;
+      await ensureContentScript(tabId, frameId);
+      return sendMessageToFrame(tabId, frameId, {
+        type: "ELEMENT_PDF_EXPORT_SELECTION",
+        options: message.options || null
+      });
+    });
+    return true;
+  }
+
+  if (message.type === "ELEMENT_PDF_CLEAR_HIGHLIGHT_FOR_TAB") {
+    withAsyncResponse(sendResponse, async () => {
+      const tabId = validateTabId(message.tabId);
+      if (message.scope === "all") {
+        await clearAllFrames(tabId);
+      } else {
+        await ensureContentScript(tabId, 0);
+        await sendMessageToFrame(tabId, 0, { type: "ELEMENT_PDF_CLEAR_HIGHLIGHT" });
+      }
+      return { ok: true };
     });
     return true;
   }
@@ -156,6 +186,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "ELEMENT_PDF_PICKER_DONE") {
+    const tabId = sender.tab?.id;
+    const frameId = Number.isInteger(sender.frameId) ? sender.frameId : 0;
+    if (Number.isInteger(tabId)) {
+      stopPickerInOtherFrames(tabId, frameId);
+    }
+    return false;
+  }
+
+  if (message.type === "ELEMENT_PDF_PICKER_HOVER") {
+    const tabId = sender.tab?.id;
+    const frameId = Number.isInteger(sender.frameId) ? sender.frameId : 0;
+    if (Number.isInteger(tabId)) {
+      clearPickerOverlayInOtherFrames(tabId, frameId);
+    }
+    return false;
+  }
+
   return false;
 });
 
@@ -163,7 +211,8 @@ async function startPickerInFrame(tabId, frameId) {
   try {
     await ensureContentScript(tabId, frameId);
     await sendMessageToFrame(tabId, frameId, {
-      type: "ELEMENT_PDF_START_PICKER"
+      type: "ELEMENT_PDF_START_PICKER",
+      mode: "export"
     });
   } catch (error) {
     console.warn("Element PDF: could not start picker", error);
@@ -177,12 +226,56 @@ async function startPickerInAllFrames(tabId) {
     await Promise.allSettled(
       frameIds.map((frameId) =>
         sendMessageToFrame(tabId, frameId, {
-          type: "ELEMENT_PDF_START_PICKER"
+          type: "ELEMENT_PDF_START_PICKER",
+          mode: "select"
         })
       )
     );
   } catch (error) {
     console.warn("Element PDF: could not start picker in frames", error);
+  }
+}
+
+async function stopPickerInOtherFrames(tabId, exceptFrameId) {
+  try {
+    const frameIds = await getInspectableFrameIds(tabId);
+    await Promise.allSettled(
+      frameIds
+        .filter((frameId) => frameId !== exceptFrameId)
+        .map((frameId) =>
+          sendMessageToFrame(tabId, frameId, { type: "ELEMENT_PDF_STOP_PICKER" })
+        )
+    );
+  } catch (_error) {
+    // Best effort: stale pickers in other frames are harmless once the tab reloads.
+  }
+}
+
+async function clearPickerOverlayInOtherFrames(tabId, exceptFrameId) {
+  try {
+    const frameIds = await getInspectableFrameIds(tabId);
+    await Promise.allSettled(
+      frameIds
+        .filter((frameId) => frameId !== exceptFrameId)
+        .map((frameId) =>
+          sendMessageToFrame(tabId, frameId, { type: "ELEMENT_PDF_CLEAR_PICKER_OVERLAY" })
+        )
+    );
+  } catch (_error) {
+    // Best effort: only the frame under the cursor keeps its picker highlight.
+  }
+}
+
+async function clearAllFrames(tabId) {
+  try {
+    const frameIds = await getInspectableFrameIds(tabId);
+    await Promise.allSettled(
+      frameIds.map((frameId) =>
+        sendMessageToFrame(tabId, frameId, { type: "ELEMENT_PDF_STOP_PICKER" })
+      )
+    );
+  } catch (_error) {
+    // Best effort: fully clears hover + selection overlays in every frame.
   }
 }
 
@@ -290,7 +383,7 @@ async function printSourceElementToPdf(payload, sender) {
       chrome.debugger.sendCommand(debuggee, "Page.printToPDF", {
         landscape: false,
         displayHeaderFooter: false,
-        printBackground: true,
+        printBackground: payload.options?.background !== false,
         preferCSSPageSize: true,
         marginTop: 0,
         marginBottom: 0,
@@ -312,8 +405,8 @@ async function printSourceElementToPdf(payload, sender) {
     await withTimeout(
       chrome.downloads.download({
         url: `data:application/pdf;base64,${result.data}`,
-        filename: makeFilename(job),
-        saveAs: true
+        filename: resolveDownloadFilename(payload.options, job),
+        saveAs: payload.options?.saveAs !== false
       }),
       DOWNLOAD_TIMEOUT_MS,
       "Timed out while starting the PDF download."
@@ -863,6 +956,21 @@ function normalizeCoordinate(value) {
 function pxToPaperInches(px) {
   const inches = px / 96;
   return Math.min(Math.max(inches, MIN_PAPER_INCHES), MAX_PAPER_INCHES);
+}
+
+function resolveDownloadFilename(options, job) {
+  const custom = options && typeof options.filename === "string" ? options.filename.trim() : "";
+  if (!custom) {
+    return makeFilename(job);
+  }
+
+  const safe = custom
+    .replace(/[\\/:*?"<>|]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120) || "selected-element";
+
+  return /\.pdf$/i.test(safe) ? safe : `${safe}.pdf`;
 }
 
 function makeFilename(job) {
