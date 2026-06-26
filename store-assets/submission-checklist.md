@@ -2,9 +2,9 @@
 
 ## Package
 
-- Upload ZIP: `dist/element-to-pdf-0.1.0.zip`
+- Upload ZIP: `dist/element-to-pdf-0.1.1.zip`
 - Manifest version: MV3
-- Version: `0.1.0`
+- Version: `0.1.1`
 - Minimum Chrome version: `116`
 
 ## Listing

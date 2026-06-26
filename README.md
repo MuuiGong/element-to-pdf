@@ -72,7 +72,7 @@ Detailed Chrome Web Store permission text is in [store-assets/permission-justifi
 The Chrome Web Store upload package is built under:
 
 ```text
-dist/element-to-pdf-0.1.0.zip
+dist/element-to-pdf-0.1.1.zip
 ```
 
 Chrome Web Store listing drafts, permission justifications, review test instructions, and submission notes are in [store-assets](store-assets).

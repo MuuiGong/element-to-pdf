@@ -217,7 +217,7 @@ async function loadActiveTab() {
     }
   } catch (error) {
     if (token !== loadToken) return;
-    showEmpty("Couldn't read this page", getErrorMessage(error));
+    showEmpty("Couldn't read this page", getPageReadErrorMessage(error, tab.url));
   }
 }
 
@@ -913,16 +913,28 @@ function setStatus(message, kind = "") {
 
 function isInspectableUrl(url) {
   if (!url) return false;
+  if (isChromeWebStoreUrl(url)) return false;
+  if (/^(chrome|chrome-extension|edge|brave|opera|vivaldi|devtools):\/\//i.test(url)) return false;
+  if (/^(view-source|data|blob):/i.test(url)) return false;
   return /^https?:|^file:|^about:blank/i.test(url);
 }
 
 function restrictedReason(url) {
+  if (isChromeWebStoreUrl(url)) {
+    return "Chrome Web Store and Developer Dashboard pages block extension access.";
+  }
   if (/^chrome:\/\//i.test(url)) return "Chrome system pages (chrome://) are off-limits to extensions.";
-  if (/^(edge|brave|about):/i.test(url)) return "Browser system pages can't be inspected.";
-  if (/chrome\.google\.com\/webstore|chromewebstore\.google\.com/i.test(url)) {
-    return "The Chrome Web Store blocks extension access.";
+  if (/^chrome-extension:\/\//i.test(url)) return "Extension pages can't be inspected.";
+  if (/^(edge|brave|opera|vivaldi|devtools):\/\//i.test(url)) return "Browser system pages can't be inspected.";
+  if (/^about:/i.test(url) && !/^about:blank/i.test(url)) return "Browser system pages can't be inspected.";
+  if (/^file:/i.test(url)) {
+    return "Local files require file access to be enabled for this extension.";
   }
   return "Open a normal web page (http/https) to inspect its elements.";
+}
+
+function isChromeWebStoreUrl(url) {
+  return /(^https?:\/\/chrome\.google\.com\/webstore\b|^https?:\/\/chromewebstore\.google\.com\b)/i.test(url);
 }
 
 function sendRuntimeMessage(message) {
@@ -936,4 +948,32 @@ function getErrorMessage(error) {
   if (!error) return "Unknown error.";
   if (typeof error === "string") return error;
   return error.message || String(error);
+}
+
+function getPageReadErrorMessage(error, url) {
+  if (!isInspectableUrl(url)) {
+    return restrictedReason(url);
+  }
+
+  const message = getErrorMessage(error);
+
+  if (/cannot access contents|extensions gallery|chrome web store|webstore/i.test(message)) {
+    return isChromeWebStoreUrl(url)
+      ? "Chrome Web Store and Developer Dashboard pages block extension access."
+      : "Chrome blocked extension access to this page.";
+  }
+
+  if (/missing host permission|cannot access.*permission|host permission/i.test(message)) {
+    return "Grant this extension site access for the page, then refresh the tab.";
+  }
+
+  if (/receiving end does not exist|message port closed|could not establish connection/i.test(message)) {
+    return "Refresh this page and try again. If you just reloaded or updated the extension, existing tabs need a refresh before they can be inspected.";
+  }
+
+  if (/^file:/i.test(url)) {
+    return "Enable 'Allow access to file URLs' for this extension, then refresh the file page.";
+  }
+
+  return message || "Could not read this page.";
 }

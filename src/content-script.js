@@ -1,11 +1,9 @@
 (() => {
-  const CONTENT_SCRIPT_VERSION = "0.3.1";
+  const CONTENT_SCRIPT_VERSION = "0.3.2";
+  const INSTANCE_ID = `${CONTENT_SCRIPT_VERSION}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 
-  if (globalThis.__elementPdfExtractorContentScriptVersion === CONTENT_SCRIPT_VERSION) {
-    return;
-  }
-
-  globalThis.__elementPdfExtractorContentScriptVersion = CONTENT_SCRIPT_VERSION;
+  globalThis.__elementToPdfContentScriptVersion = CONTENT_SCRIPT_VERSION;
+  globalThis.__elementToPdfContentScriptInstanceId = INSTANCE_ID;
 
   const DEVTOOLS_EXPORT_EVENT = "__ELEMENT_TO_PDF_DEVTOOLS_EXPORT__";
   const MAX_CAPTURE_WIDTH = 19200;
@@ -157,12 +155,22 @@
   let lastPickerHoverNotify = 0;
   let overlayRaf = 0;
 
-  document.addEventListener(DEVTOOLS_EXPORT_EVENT, handleDevtoolsExportEvent, true);
+  document.addEventListener(DEVTOOLS_EXPORT_EVENT, (event) => {
+    if (isCurrentInstance()) handleDevtoolsExportEvent(event);
+  }, true);
   // Keep the persistent selection/hover boxes aligned when the page scrolls.
-  window.addEventListener("scroll", scheduleOverlayReposition, true);
-  window.addEventListener("resize", scheduleOverlayReposition, true);
+  window.addEventListener("scroll", () => {
+    if (isCurrentInstance()) scheduleOverlayReposition();
+  }, true);
+  window.addEventListener("resize", () => {
+    if (isCurrentInstance()) scheduleOverlayReposition();
+  }, true);
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (!isCurrentInstance()) {
+      return false;
+    }
+
     if (!message || typeof message !== "object") {
       return false;
     }
@@ -304,6 +312,10 @@
 
     return false;
   });
+
+  function isCurrentInstance() {
+    return globalThis.__elementToPdfContentScriptInstanceId === INSTANCE_ID;
+  }
 
   function startPicker(mode = "export") {
     if (pickerActive) return;
