@@ -440,12 +440,6 @@
         throw new Error(response?.error || "Background worker rejected the capture.");
       }
 
-      showToast(
-        response?.mode === "source-print"
-          ? "PDF download started."
-          : "Print tab opened. Preparing PDF...",
-        "success"
-      );
       return response;
     } catch (error) {
       console.warn("element-to-pdf: capture failed", error);
